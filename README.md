@@ -1,11 +1,15 @@
-# EmissaoCO2_AnaliseDados
-Consultoria de dados na Emissão de CO2 no mundo.
-
-
 
 <div align="center">
 
-  <h2>🌍 Explore a Análise de CO₂</h2>
+  <h1>🌍 EmissaoCO2_AnaliseDados</h1>
+
+  <p>
+    Consultoria de dados sobre as emissões de CO₂ no mundo.
+  </p>
+
+  <hr width="60%">
+
+  <h2>📊 Explore a Análise de CO₂</h2>
 
   <p>
     Acesse o notebook completo com o processo de ETL,
@@ -13,7 +17,7 @@ Consultoria de dados na Emissão de CO2 no mundo.
     projeções de emissões globais até 2030.
   </p>
 
-  <a href="https://colab.research.google.com/drive/1EIdZj9wjPvtW1BeGhnf_IMDGYSvIgmjr?usp=sharing" target="_blank">
+  <a href="https://colab.research.google.com/drive/1EIdZj9wjPvtW1BeGhnf_IMDGYSvIgmjr?usp=sharing">
     <img
       src="https://colab.research.google.com/assets/colab-badge.svg"
       alt="Abrir no Google Colab"
@@ -21,7 +25,7 @@ Consultoria de dados na Emissão de CO2 no mundo.
   </a>
 
   <p>
-    <sub>🐍 Python • 🐼Pandas • Análise de Dados • Business Intelligence</sub>
+    <sub>🐍 Python • 🐼 Pandas • Análise de Dados • Business Intelligence</sub>
   </p>
 
 </div>
