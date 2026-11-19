@@ -11,24 +11,24 @@ from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 from dados_co2 import ULTIMO_ANO, Dados
 
-# ----------------------------------------------------------------- parâmetros de negócio
-MIN_EMISSAO_MT = 5               # países menores que isso ficam fora de rankings e grupos
+# Estes valores são padrões de análise do projeto, não limites definidos por uma política climática.
+MIN_EMISSAO_MT = 5               # países menores que isso ficam fora do semáforo e dos grupos
 HORIZONTE = 11                   # anos projetados (2025–2035)
 ANOS_BACKTEST = 10               # teste: 2015–2024
 JANELA_TENDENCIA = 15            # anos usados nos modelos linear e drift
 CRESC_EMERGENTE = 0.03           # crescimento a.a. que define "industrialização rápida"
-EMISSAO_MIN_EMERGENTE_MT = 20
+EMISSAO_MIN_EMERGENTE_MT = 20    # Mt mínimos para entrar no cenário de emergentes
 SEMAFORO_VERDE = -1.0            # % a.a.: queda de pelo menos 1% = verde
 SEMAFORO_VERMELHO = 2.0          # % a.a.: alta de 2% ou mais = vermelho
-LIMIAR_CARVAO = 0.30
-LIMIAR_USO_TERRA = 0.40
-MULT_PER_CAPITA_ALTO = 2.0
-MULT_PER_CAPITA_BAIXO = 0.5
-MULT_INTENSIDADE_ALTA = 1.5
+LIMIAR_CARVAO = 0.30            # recomenda trocar fontes se o carvão for 30% ou mais
+LIMIAR_USO_TERRA = 0.40          # recomenda ação se uso da terra passar de 40%
+MULT_PER_CAPITA_ALTO = 2.0       # alto: mais que 2 vezes a média mundial
+MULT_PER_CAPITA_BAIXO = 0.5      # baixo: menos da metade da média mundial
+MULT_INTENSIDADE_ALTA = 1.5      # alta: mais que 1,5 vez a intensidade mundial
 PIB_MIN_BENCHMARK = 5e10         # US$: só economias relevantes entram como referência
-META_REDUCAO_ANUAL = 0.01
-ANOS_META = 10
-FATOR_REFERENCIA_2030 = 0.55     # referência aproximada do IPCC SR1.5 (queda de ~45% sobre 2010)
+META_REDUCAO_ANUAL = 0.01        # redução anual usada na recomendação de mobilização
+ANOS_META = 10                   # duração dessa estimativa
+FATOR_REFERENCIA_2030 = 0.55     # aproximação inspirada no IPCC SR1.5; não é a meta oficial aplicada diretamente.
 
 GRUPOS = (
     "Grupo 1 – Contenção imediata",
@@ -52,6 +52,7 @@ def cagr(inicio, fim, anos: int):
     """Crescimento anual composto (aceita séries ou escalares; inválido vira NaN)."""
     if anos <= 0:
         return inicio * np.nan
+    # Converte a mudança total em uma taxa anual equivalente.
     resultado = (fim / inicio) ** (1 / anos) - 1
     if isinstance(resultado, pd.Series):
         return resultado.where((inicio > 0) & (fim > 0))
@@ -97,6 +98,7 @@ def prever(serie: pd.Series, horizonte: int = HORIZONTE) -> Previsao | None:
     def holt(amostra, passos):
         return ExponentialSmoothing(amostra, trend="add", damped_trend=True).fit().forecast(passos)
 
+    # Guardamos os últimos dez anos para testar cada modelo antes de projetar.
     modelos = {"Tendência linear (15 anos)": linear, "Drift (15 anos)": drift, "Holt amortecido": holt}
     teste = y[-ANOS_BACKTEST:]
     resultados = {}
@@ -111,7 +113,8 @@ def prever(serie: pd.Series, horizonte: int = HORIZONTE) -> Previsao | None:
         return None
     melhor = min(resultados, key=lambda nome: resultados[nome][0])
     mape, rmse = resultados[melhor]
-    banda = 1.28 * rmse * np.sqrt(np.arange(1, horizonte + 1) / 5)  # faixa de ~80%
+    # Faixa heurística baseada no erro do teste; não é um intervalo de confiança formal.
+    banda = 1.28 * rmse * np.sqrt(np.arange(1, horizonte + 1) / 5)
     return Previsao(melhor, mape, np.asarray(modelos[melhor](y, horizonte)), banda)
 
 
@@ -133,6 +136,7 @@ def simular_cenario(dados: Dados, reducao: float, troca: float, janela: int) -> 
     anos = np.arange(ULTIMO_ANO + 1, ULTIMO_ANO + 1 + HORIZONTE)
     hist = co2.loc[ULTIMO_ANO - 10:ULTIMO_ANO]
     x = np.arange(len(hist))
+    # A linha de base prolonga a tendência linear observada nos últimos dez anos.
     inclinacao = hist.apply(
         lambda col: np.polyfit(x[col.notna().values], col.dropna().values, 1)[0] if col.notna().sum() >= 6 else np.nan
     )
@@ -141,6 +145,7 @@ def simular_cenario(dados: Dados, reducao: float, troca: float, janela: int) -> 
         {iso: np.maximum(co2.loc[ULTIMO_ANO, iso] + inclinacao[iso] * (anos - ULTIMO_ANO), 0) for iso in validos},
         index=anos,
     )
+    # Os cinco maiores seguem a redução anual; os demais elegíveis são tratados como emergentes.
     top5 = list(co2.loc[ULTIMO_ANO, validos].nlargest(5).index)
     crescimento = cagr(co2.loc[ULTIMO_ANO - janela, validos], co2.loc[ULTIMO_ANO, validos], janela)
     emergentes = [
@@ -151,6 +156,7 @@ def simular_cenario(dados: Dados, reducao: float, troca: float, janela: int) -> 
     cenario = base.copy()
     for iso in top5:
         cenario[iso] = base[iso] * (1 - reducao / 100) ** (anos - ULTIMO_ANO)
+    # A troca de carvão cresce gradualmente até 2035 e respeita a participação do carvão no país.
     for iso in emergentes:
         peso_carvao = np.clip(carvao.loc[ULTIMO_ANO, iso] / co2.loc[ULTIMO_ANO, iso], 0, 1)
         cenario[iso] = base[iso] * (1 - troca / 100 * (anos - ULTIMO_ANO) / HORIZONTE * peso_carvao)
@@ -190,6 +196,7 @@ def classificar_grupos(dados: Dados, permitidos: list, fim: int, janela: int,
     tabela["Participação (%)"] = tabela["CO₂ (Mt)"] / dados.mundo["co2"].get(fim, np.nan) * 100
     alto_volume = tabela["Participação (%)"] >= volume
     alto_cresc = tabela["Crescimento a.a. (%)"] >= crescimento_alto
+    # Volume e crescimento combinados definem a prioridade de cada país.
     tabela["Grupo"] = np.select(
         [alto_volume & alto_cresc, ~alto_volume & alto_cresc, alto_volume & ~alto_cresc], GRUPOS[:3], GRUPOS[3]
     )
@@ -206,6 +213,7 @@ def semaforo(dados: Dados, permitidos: list, fim: int, janela: int, limite: int 
         "Crescimento a.a. (%)": (cagr(co2.loc[fim - janela, permitidos], final, janela) * 100).values,
     }).dropna()
     tabela = tabela[tabela["CO₂ (Mt)"] >= MIN_EMISSAO_MT].copy()
+    # Queda de pelo menos 1% é verde; alta de 2% ou mais é vermelha.
     tabela["Status"] = np.select(
         [tabela["Crescimento a.a. (%)"] <= SEMAFORO_VERDE, tabela["Crescimento a.a. (%)"] >= SEMAFORO_VERMELHO],
         ["Verde", "Vermelho"], "Amarelo",
@@ -231,6 +239,7 @@ def benchmark(dados: Dados, alvo: list, ano: int, janela: int, n: int = 3) -> pd
     pib_pc_alvo = dados.soma("gdp", alvo).get(ano, np.nan) / dados.soma("population", alvo).get(ano, np.nan)
     if candidatos.empty or not np.isfinite(pib_pc_alvo) or pib_pc_alvo <= 0:
         return candidatos.iloc[0:0]
+    # A distância logarítmica compara rendas relativas, não a diferença bruta em dólares.
     candidatos["Distância de renda"] = np.abs(np.log(candidatos["PIB per capita"] / pib_pc_alvo))
     return candidatos.nsmallest(n, "Distância de renda").drop(columns=["PIB", "Distância de renda"])
 

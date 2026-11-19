@@ -32,6 +32,7 @@ responsabilidade principal:
 | [`dashboard_colab.py`](./dashboard_colab.py) | Cria os filtros, gráficos, tabelas, abas e cartões de KPI. |
 | [`dashboard_co2_colab.ipynb`](./dashboard_co2_colab.ipynb) | Inicia o dashboard em um notebook Jupyter ou Colab. |
 | [`dashboard_co2_colab.py`](./dashboard_co2_colab.py) | Mantém um nome de entrada compatível com versões anteriores do projeto. |
+| [`requirements.txt`](./requirements.txt) | Lista as bibliotecas e versões mínimas para instalar o projeto. |
 
 O fluxo principal é:
 
@@ -130,9 +131,15 @@ O `statsmodels` é usado em `indicadores_co2.py` para o modelo de suavização
 exponencial de Holt com tendência amortecida. Esse é um dos modelos
 comparados para gerar projeções.
 
-O código também avalia tendências linear e drift. As alternativas são
-comparadas com um backtest nos anos de 2015 a 2024, e o modelo com menor MAPE
-(erro percentual absoluto médio) é escolhido para a projeção.
+O código também avalia tendências linear e drift com os 15 anos mais recentes.
+Os três modelos são comparados com um backtest nos anos de 2015 a 2024, e o
+modelo com menor MAPE (erro percentual absoluto médio) é escolhido para a
+projeção.
+
+### Jinja2
+
+O Jinja2 permite que o Pandas monte as tabelas formatadas usadas no painel.
+Por isso, ele aparece como dependência explícita no `requirements.txt`.
 
 ### IPython
 
@@ -145,6 +152,11 @@ notebook. O dashboard usa essa funcionalidade para apresentar:
 - gráficos do Plotly.
 
 O CSS do tema estiliza esse conteúdo HTML junto com os widgets.
+
+### ipykernel
+
+O ipykernel executa as células Python do notebook. O Voilà usa esse kernel para
+montar o dashboard antes de exibi-lo no navegador.
 
 ### Bibliotecas padrão do Python
 
@@ -161,7 +173,8 @@ instalados separadamente:
 
 ## 4. Como os dados são preparados
 
-O conjunto de dados vem da Our World in Data e do Global Carbon Project.
+O conjunto de dados é publicado pela Our World in Data, com emissões do Global
+Carbon Project e outras fontes.
 `dados_co2.py` tenta encontrar o arquivo nesta ordem geral:
 
 1. no caminho passado para a função `ler_dados`;
@@ -169,17 +182,21 @@ O conjunto de dados vem da Our World in Data e do Global Carbon Project.
 3. na pasta `doc`;
 4. em caminhos usados pelo Google Colab.
 
-Se nenhum arquivo local for encontrado, o módulo tenta ler o CSV diretamente
-da URL definida no próprio arquivo.
+Se nenhum arquivo local for encontrado, o módulo tenta ler o CSV do catálogo
+atual da Our World in Data. A lista de colunas exigidas pelo código foi
+conferida com esse CSV em 19/11/2026. O repositório antigo
+[`owid/co2-data`](https://github.com/owid/co2-data) informa que seus arquivos
+deixaram de ser atualizados e aponta para o novo catálogo.
 
 Depois da leitura, o código seleciona apenas as colunas necessárias, como
 emissão total, população, PIB, emissão per capita e emissões por fonte. Também
 remove linhas agregadas que não representam países individuais, preservando
 os dados agregados do mundo para comparações.
 
-O limite de análise está definido em 2024 porque 2025 é parcial na versão do
-dataset considerada pelo projeto. Assim, os indicadores e a interface não
-tratam o ano parcial como se fosse um ano completo.
+O painel está configurado para analisar até 2024, mesmo que a fonte contenha
+anos mais recentes. Esse é o corte adotado nesta versão do projeto. Ao mudá-lo,
+também é preciso revisar o backtest, as projeções e os textos que exibem o ano
+final.
 
 O arquivo `Dados` mantém:
 
@@ -191,7 +208,7 @@ O arquivo `Dados` mantém:
 O dataset não fornece a classificação de continente utilizada pelo painel.
 Por isso, as listas de códigos de países por continente e por bloco estão
 definidas manualmente em `dados_co2.py`. Países não encontrados nessas listas
-ficam em “Outros”.
+recebem a classificação “Outros”, que não é uma opção separada no filtro.
 
 ## 5. Como os indicadores e as visualizações são criados
 
@@ -227,9 +244,20 @@ pelas cinco áreas:
 4. **Projeções:** projeções até 2035 e simulador de cenários.
 5. **Decisão:** grupos de prioridade, recomendações e benchmark.
 
+O intervalo de anos e a janela controlam as análises históricas. Continente e
+bloco definem o conjunto de países usado nas comparações. O país em foco
+prioriza os KPIs e o plano de ação, enquanto o mapa e os rankings continuam
+mostrando o conjunto filtrado por continente e bloco. Na aba de projeções, a
+série é escolhida em um controle próprio e a previsão usa o corte mais recente
+definido em `dados_co2.py`.
+
 Os KPIs do topo resumem o escopo filtrado. Por exemplo, o acumulado usa o
 intervalo selecionado e o indicador per capita relaciona as emissões com a
 população.
+
+Na aba **Projeções**, o simulador usa os dados de todos os países e a janela
+selecionada; os filtros de continente, bloco e país em foco não reduzem esse
+conjunto.
 
 ### Tema visual
 
@@ -240,24 +268,110 @@ legível sobre o fundo azul-marinho.
 
 ## 6. Como executar
 
-Na raiz do repositório, instale as dependências e inicie o Voilà:
+O projeto recomenda Python 3.10 ou mais recente. A raiz do repositório contém
+um `requirements.txt` com as dependências. No Linux ou macOS, execute:
 
 ```bash
-python -m pip install numpy pandas plotly ipywidgets statsmodels voila
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
 voila dashboard_co2_colab.ipynb --no-browser --port 8866
 ```
 
-Depois, abra `http://localhost:8866` no navegador.
+No Windows PowerShell, use:
 
-Se o projeto estiver em um ambiente virtual, ative-o antes de instalar as
-bibliotecas e iniciar o Voilà. O arquivo `dashboard_co2_colab.ipynb` importa o
-módulo do dashboard e chama `criar_dashboard()`.
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+voila dashboard_co2_colab.ipynb --no-browser --port 8866
+```
+
+Depois, abra `http://localhost:8866` no navegador. Não é necessário iniciar o
+Jupyter manualmente: o Voilà executa o notebook de entrada. O arquivo
+`dashboard_co2_colab.ipynb` importa o módulo do dashboard e chama
+`criar_dashboard()`.
 
 O CSV pode ficar em `doc/owid-co2-data.csv`. Se o arquivo não estiver
 disponível, o código tenta buscar os dados online. Portanto, essa alternativa
 precisa de conexão com a internet.
 
-## 7. Cuidados ao interpretar os resultados
+## 7. Regras e fórmulas principais
+
+Os limites abaixo são escolhas do projeto para organizar a análise. Não são
+limites científicos ou metas oficiais, e parte deles pode ser ajustada pelos
+controles do dashboard.
+
+### Crescimento e grupos de prioridade
+
+O crescimento anual composto (CAGR) é calculado como
+`(emissão_final / emissão_inicial) ** (1 / anos) - 1`. A conta só é válida
+quando os dois valores são positivos.
+
+Na aba **Decisão**, os padrões são:
+
+- emissão mínima para entrar em rankings e grupos: 5 Mt;
+- participação alta nas emissões mundiais: 2% ou mais;
+- crescimento alto: 1% ao ano ou mais.
+
+Volume e crescimento formam quatro grupos: volume alto com crescimento alto
+fica em contenção imediata; apenas crescimento alto indica transição
+preventiva; apenas volume alto indica redução sustentada; os demais ficam em
+monitoramento.
+
+O semáforo usa outras faixas: verde para queda anual de pelo menos 1%,
+vermelho para crescimento de 2% ou mais e amarelo entre esses limites. A tabela
+mostra no máximo os 30 maiores emissores.
+
+As recomendações usam ainda estes padrões: carvão a partir de 30% das emissões,
+uso da terra a partir de 40%, emissão per capita acima de 2 vezes ou abaixo de
+metade da média mundial, e intensidade de carbono acima de 1,5 vez a média
+mundial.
+
+A recomendação de mobilização estima o CO₂ evitado ao reduzir 1% ao ano durante
+dez anos. Ela compara essa redução composta com a hipótese simplificada de que
+a emissão anual atual permaneceria constante.
+
+### Projeções e simulador
+
+Para a projeção, o código compara tendência linear, drift e Holt amortecido.
+Os modelos são treinados com os dados anteriores ao período de teste e
+comparados nos dez anos de 2015 a 2024. O MAPE do backtest escolhe o modelo
+exibido; depois, o modelo é ajustado à série completa até 2024 para projetar
+2025–2035.
+
+A faixa exibida é uma heurística calculada com o RMSE do backtest:
+`1,28 × RMSE × raiz(horizonte / 5)`. Ela não é um intervalo estatístico com
+cobertura garantida de 80%.
+
+No simulador, a linha de base prolonga linearmente a tendência dos últimos dez
+anos. No cenário inicial, os cinco maiores emissores reduzem 3% ao ano. Outros
+países entram no grupo de industrialização rápida quando crescem pelo menos 3%
+ao ano e emitem pelo menos 20 Mt; nesses países, a substituição do carvão
+aumenta gradualmente até 30% em 2035. Os sliders permitem mudar as taxas.
+
+O ponto de referência de 2030 usa 55% do CO₂ fóssil observado em 2010. É uma
+comparação simplificada inspirada no IPCC SR1.5, não a reprodução da meta
+oficial: o IPCC trata de emissões globais líquidas de CO₂, enquanto o simulador
+usa o indicador de CO₂ fóssil desta base de dados.
+
+## 8. Fontes e atualização dos dados
+
+- **Dataset:** [Our World in Data — CO₂ and greenhouse gas emissions](https://catalog.ourworldindata.org/emissions/owid_co2/readme.md).
+- **CSV usado como fallback pelo código:** [download do catálogo OWID](https://catalog.ourworldindata.org/emissions/owid_co2/owid_co2.csv).
+- **Codebook:** [descrições das colunas](https://catalog.ourworldindata.org/emissions/owid_co2/owid_co2.codebook.csv).
+- **Crédito indicado pela fonte:** Global Carbon Budget (2026) e outras fontes, com processamento principal da Our World in Data.
+- **Referência climática:** [IPCC, Special Report on Global Warming of 1.5°C](https://www.ipcc.ch/sr15/), em especial o Summary for Policymakers, seção C.1.
+- **Summary for Policymakers (PDF):** [relatório oficial](https://www.ipcc.ch/site/assets/uploads/sites/2/2022/06/SPM_version_report_LR.pdf).
+
+O CSV `doc/owid-co2-data.csv` desta cópia do repositório foi versionado no Git
+em 12/11/2026. Como o arquivo local tem prioridade, ele pode produzir números
+diferentes do fallback online. Para repetir uma análise, use a mesma cópia local
+e registre o commit ou a data do arquivo. O fallback online aponta para o
+catálogo atual e pode mudar com novas publicações da fonte. A fonte e o código
+foram conferidos em 19/11/2026.
+
+## 9. Cuidados ao interpretar os resultados
 
 - **Classificação geográfica:** continentes e blocos são mantidos em listas
   manuais e podem precisar de atualização.
@@ -279,7 +393,7 @@ precisa de conexão com a internet.
   indicador, por exemplo Mt, Gt, t/hab e kg/US$. Confira os rótulos do gráfico
   ou da tabela antes de comparar números.
 
-## 8. Resumo para quem está começando
+## 10. Resumo para quem está começando
 
 Uma forma simples de lembrar o papel de cada parte é:
 

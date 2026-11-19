@@ -9,9 +9,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-DATA_URL = "https://raw.githubusercontent.com/owid/co2-data/master/owid-co2-data.csv"
+# A OWID mudou o CSV atual para o catálogo; as colunas continuam compatíveis com o leitor.
+DATA_URL = "https://catalog.ourworldindata.org/emissions/owid_co2/owid_co2.csv"
 PRIMEIRO_ANO = 1750
-ULTIMO_ANO = 2024  # 2025 é parcial no dataset
+ULTIMO_ANO = 2024  # Corte adotado pelo painel; não é necessariamente o último ano da fonte.
 
 COLUNAS = [
     "country", "year", "iso_code", "co2", "population", "gdp", "co2_per_capita",
@@ -75,6 +76,7 @@ class Dados:
 @lru_cache(maxsize=2)
 def ler_dados(caminho_csv: str | None = None) -> Dados:
     """Lê o CSV local (se existir) ou baixa da OWID. O resultado fica em cache."""
+    # Preferimos a cópia local para que as análises não mudem a cada execução.
     candidatos = [
         Path(caminho_csv) if caminho_csv else None,
         Path("owid-co2-data.csv"),
@@ -96,11 +98,13 @@ def ler_dados(caminho_csv: str | None = None) -> Dados:
 
     bruto = bruto.loc[bruto["year"] <= ULTIMO_ANO].copy()
     bruto["year"] = bruto["year"].astype(int)
+    # Guardamos o agregado mundial separado para calcular participações globais.
     mundo = bruto.loc[bruto["country"] == "World"].set_index("year")
     if mundo.empty or ULTIMO_ANO not in mundo.index:
         raise ValueError(f"O dataset não contém dados agregados do mundo para {ULTIMO_ANO}.")
 
     iso = bruto["iso_code"].astype("string")
+    # Linhas OWID_* são grupos e regiões; os gráficos de países não devem misturá-las.
     paises = bruto.loc[
         bruto["iso_code"].notna() & (~iso.str.startswith("OWID_", na=False) | iso.eq("OWID_KOS"))
     ].copy()  # só países: agregados (World, continentes, grupos de renda) ficam fora

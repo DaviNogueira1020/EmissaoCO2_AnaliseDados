@@ -110,6 +110,7 @@ def obter_contexto(dados: Dados, intervalo, continente, bloco, pais_foco, janela
     ini, fim = intervalo
     fim = max(fim, PRIMEIRO_ANO + janela)
     ini = min(ini, fim - 1)
+    # Região e bloco definem a lista de comparação; o país em foco restringe só o escopo dos indicadores.
     permitidos = [
         iso for iso in dados.isos
         if (continente == "Todos" or dados.continentes.get(iso, "Outros") == continente)
@@ -477,6 +478,7 @@ def criar_dashboard(caminho_csv: str | None = None) -> widgets.VBox:
             if exige_escopo and not ctx.escopo:
                 return vazio("Nenhum país atende aos filtros.")
             funcao(dados, ctx, **valores)
+        # O ipywidgets chama essa função sempre que um filtro associado muda.
         return widgets.interactive_output(atualizar, {**comuns, **extras})
 
     out_kpis = saida(exibir_kpis)
