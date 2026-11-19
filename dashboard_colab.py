@@ -236,32 +236,36 @@ def exibir_dispersao(dados: Dados, ctx: Contexto, metrica: str, eixo: str) -> No
 
 
 # ----------------------------------------------------------------- aba 2: pontos de inflexão
-def exibir_inflexoes(dados: Dados, ctx: Contexto, part_max, co2_min, cresc_min, part_atual_max) -> None:
+def exibir_deteccao(dados: Dados, ctx: Contexto, part_max, co2_min) -> None:
     tab = tabela_aceleracao(dados, ctx.permitidos, ctx.fim, ctx.janela)
-
     det = tab[(tab["CO₂ início (Mt)"] >= 1) & (tab["Participação inicial (%)"] < part_max)
               & (tab["CO₂ fim (Mt)"] >= co2_min)].dropna(subset=["Multiplicador"]).nlargest(15, "Multiplicador")
     if det.empty:
         titulo("Detector de crescimento acelerado")
-        vazio("Nenhum país atende aos critérios atuais.")
-    else:
-        topo = det.iloc[0]
-        titulo(f"{topo['País']} multiplicou suas emissões por {br(topo['Multiplicador'])}x em {ctx.janela} anos")
-        fig = px.bar(det.iloc[::-1], x="Multiplicador", y="País", orientation="h", color="Participação atual (%)")
-        emitir(fig, 440)
+        return vazio("Nenhum país atende aos critérios atuais.")
+    topo = det.iloc[0]
+    titulo(f"{topo['País']} multiplicou suas emissões por {br(topo['Multiplicador'])}x em {ctx.janela} anos")
+    fig = px.bar(det.iloc[::-1], x="Multiplicador", y="País", orientation="h", color="Participação atual (%)")
+    emitir(fig, 440)
 
+
+def exibir_boom(dados: Dados, ctx: Contexto) -> None:
     iso_boom = ctx.iso_foco if ctx.iso_foco in dados.isos else "CHN"
     serie = dados.matrizes["co2"][iso_boom].dropna() if iso_boom in dados.isos else pd.Series(dtype=float)
     saltos = (serie - serie.shift(ctx.janela)).dropna()
-    if not saltos.empty:
-        ano_boom = int(saltos.idxmax())
-        titulo(f"Antes e depois do boom: {dados.nomes[iso_boom]} (maior salto em {ano_boom})")
-        fig = px.line(x=serie.index, y=serie.values, labels={"x": "Ano", "y": "Mt de CO₂"})
-        fig.update_traces(line_color=COR)
-        fig.add_vrect(x0=ano_boom - ctx.janela, x1=ano_boom, fillcolor=COR, opacity=0.2, line_width=0,
-                      annotation_text="boom industrial", annotation_position="top left")
-        emitir(fig, 340)
+    if saltos.empty:
+        return
+    ano_boom = int(saltos.idxmax())
+    titulo(f"Antes e depois do boom: {dados.nomes[iso_boom]} (maior salto em {ano_boom})")
+    fig = px.line(x=serie.index, y=serie.values, labels={"x": "Ano", "y": "Mt de CO₂"})
+    fig.update_traces(line_color=COR)
+    fig.add_vrect(x0=ano_boom - ctx.janela, x1=ano_boom, fillcolor=COR, opacity=0.2, line_width=0,
+                  annotation_text="boom industrial", annotation_position="top left")
+    emitir(fig, 340)
 
+
+def exibir_crescimento_atual(dados: Dados, ctx: Contexto, co2_min, cresc_min, part_atual_max) -> None:
+    tab = tabela_aceleracao(dados, ctx.permitidos, ctx.fim, ctx.janela)
     repeticao = tab[(tab["Crescimento a.a. (%)"] >= cresc_min) & (tab["Participação atual (%)"] <= part_atual_max)
                     & (tab["CO₂ fim (Mt)"] >= co2_min)].sort_values("Crescimento a.a. (%)", ascending=False)
     titulo(f"{len(repeticao)} países crescem hoje a {br(cresc_min)}% ao ano ou mais")
@@ -422,12 +426,14 @@ def _slider(rotulo: str, valor, minimo, maximo, passo) -> widgets.VBox:
     return campo
 
 
-def _aba(controles: list, conteudo: widgets.Widget) -> widgets.GridBox:
-    """Controles à esquerda (280 px) e resultados à direita."""
+def _aba(controles: list, conteudo: widgets.Widget, largura_total: tuple = ()) -> widgets.GridBox:
+    """Controles à esquerda (280 px) e resultados à direita; `largura_total` ocupa a linha inteira."""
     lateral = widgets.VBox(controles)
     lateral.add_class("co2-controles")
-    grade = widgets.GridBox([lateral, conteudo], layout=widgets.Layout(
-        width="100%", grid_template_columns="280px minmax(0, 1fr)", grid_gap="18px"))
+    for bloco in largura_total:
+        bloco.layout.grid_column = "1 / -1"
+    grade = widgets.GridBox([lateral, conteudo, *largura_total], layout=widgets.Layout(
+        width="100%", grid_template_columns="280px minmax(0, 1fr)", grid_gap="0 18px"))
     grade.add_class("co2-aba")
     return grade
 
@@ -486,8 +492,12 @@ def criar_dashboard(caminho_csv: str | None = None) -> widgets.VBox:
     aba_geral.children[1].children[1].add_class("co2-par")
     aba_inflexao = _aba(
         [part_max, co2_min, cresc_min, part_atual],
-        saida(exibir_inflexoes, exige_escopo=False, part_max=part_max.slider, co2_min=co2_min.slider,
-              cresc_min=cresc_min.slider, part_atual_max=part_atual.slider))
+        saida(exibir_deteccao, exige_escopo=False, part_max=part_max.slider, co2_min=co2_min.slider),
+        largura_total=(
+            saida(exibir_boom, exige_escopo=False),
+            saida(exibir_crescimento_atual, exige_escopo=False, co2_min=co2_min.slider,
+                  cresc_min=cresc_min.slider, part_atual_max=part_atual.slider),
+        ))
     aba_matriz = _aba([_campo("Escala", escala)], saida(exibir_matriz, escala=escala))
     aba_projecao = _aba(
         [_campo("Série", serie), reducao, troca],

@@ -20,6 +20,7 @@ PALETA = {
     "borda_forte": "#7392B2",
     "texto": "#FFFFFF",
     "texto_suave": "#D9E6F3",
+    "acento_forte": "#2A6FBA",  # fundo de botões ativos (texto branco, contraste 5:1)
     "acento": "#5AA9F0",        # série principal e destaques
     "alerta": "#FF8A65",        # usado só para risco (grupo 1, alta de emissão)
 }
@@ -39,7 +40,7 @@ COR_SITUACAO = {
 }
 ESTILO_STATUS = {
     "Verde": "background-color:#1F7A5C;color:#FFFFFF;font-weight:700;text-align:center",
-    "Amarelo": "background-color:#F5C26B;color:#071A33;font-weight:700;text-align:center",
+    "Amarelo": "background-color:#9C5F00;color:#FFFFFF;font-weight:700;text-align:center",
     "Vermelho": "background-color:#C8553D;color:#FFFFFF;font-weight:700;text-align:center",
 }
 FONTE = "Manrope, 'Segoe UI', system-ui, -apple-system, sans-serif"
@@ -63,6 +64,8 @@ def formatar_figura(fig, altura: int = 420):
         legend={"title_text": "", "bgcolor": "rgba(13,42,74,0.92)", "font": {"color": PALETA["texto"]}},
         hoverlabel={"bgcolor": PALETA["bg"], "bordercolor": PALETA["borda_forte"],
                     "font": {"color": PALETA["texto"], "family": FONTE}},
+        modebar={"bgcolor": "rgba(0,0,0,0)", "color": PALETA["texto_suave"],
+                 "activecolor": PALETA["texto"]},
     )
     fig.update_coloraxes(colorscale=ESCALA, colorbar={
         "outlinewidth": 0, "thickness": 12, "tickfont": {"color": PALETA["texto"]}})
@@ -77,7 +80,7 @@ def formatar_figura(fig, altura: int = 420):
 # As cores entram no CSS pelas variáveis --bg, --surface… (um só lugar para mudar o tema).
 CSS_VARIAVEIS = Template("""
 .co2-app{--bg:$bg;--surface:$surface;--surface-2:$surface2;--borda:$borda;--borda-forte:$borda_forte;
- --texto:$texto;--texto-suave:$texto_suave;--acento:$acento;--alerta:$alerta;
+ --texto:$texto;--texto-suave:$texto_suave;--acento:$acento;--acento-forte:$acento_forte;--alerta:$alerta;
  --jp-widgets-font-size:14px;--jp-widgets-color:$texto;--jp-widgets-label-color:$texto_suave;
  --jp-widgets-readout-color:$texto;--jp-widgets-slider-active-handle-color:$acento;
  --jp-widgets-slider-handle-border-color:$texto;--jp-widgets-slider-handle-background-color:$surface2;
@@ -90,6 +93,15 @@ CSS_REGRAS = """
 .co2-app{font-family:Manrope,'Segoe UI',system-ui,sans-serif;color:var(--texto);background:var(--bg);
  padding:24px;border-radius:18px;width:100%;box-sizing:border-box}
 .co2-app button,.co2-app select,.co2-app input,.co2-app label,.co2-app li{font-family:inherit!important}
+/* todo texto é branco, inclusive nos contêineres que Jupyter, Voilà e Colab pintam de preto no tema claro */
+.co2-app .jp-RenderedHTMLCommon,.co2-app .jp-OutputArea-output,.co2-app .widget-html-content,
+.co2-app .widget-output,.co2-app .output_subarea,.co2-app .output_html{color:var(--texto)}
+/* sem barras de rolagem: o ipywidgets põe overflow:auto nas caixas e 100% mais a margem de 2px estoura em 4px */
+.co2-app .widget-box,.co2-app .widget-hbox,.co2-app .widget-vbox,.co2-app .widget-gridbox,
+.co2-app .widget-slider,.co2-app .widget-dropdown{overflow:visible!important}
+.co2-app .widget-slider,.co2-app .widget-dropdown{margin-left:0!important;margin-right:0!important}
+.co2-app .widget-dropdown{height:auto!important;min-height:40px}
+.co2-app *{scrollbar-width:thin;scrollbar-color:var(--borda-forte) transparent}
 
 /* topo: título + cartões de KPI */
 .co2-topo{background:linear-gradient(135deg,var(--bg) 0%,var(--surface-2) 100%);border:1px solid var(--borda);
@@ -102,22 +114,22 @@ CSS_REGRAS = """
 .co2-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;padding:18px 24px 22px}
 .co2-kpi{background:rgba(255,255,255,.05);border:1px solid var(--borda);border-radius:14px;padding:14px 18px}
 .co2-kpi-rotulo{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--texto-suave)}
-.co2-kpi-valor{margin-top:6px;font-size:26px;font-weight:800;line-height:1.15;overflow-wrap:anywhere;
+.co2-kpi-valor{margin-top:6px;color:var(--texto);font-size:26px;font-weight:800;line-height:1.15;overflow-wrap:anywhere;
  font-variant-numeric:tabular-nums}
 .co2-kpi-ctx{margin-top:3px;font-size:12px;color:var(--texto-suave)}
 .co2-up{color:var(--alerta)}.co2-down{color:var(--acento)}
 
 /* títulos e notas dentro das abas */
-.co2-titulo{margin:24px 0 12px;padding-bottom:10px;border-bottom:1px solid var(--borda);font-size:19px;
+.co2-titulo{margin:15px 0 12px;padding-bottom:10px;border-bottom:1px solid var(--borda);font-size:19px;
  font-weight:700;letter-spacing:-.01em;color:var(--texto)}
 .co2-subtitulo{margin:18px 0 8px;font-size:15px;font-weight:700;color:var(--texto-suave)}
 .co2-nota{margin:8px 0 14px;padding:10px 14px;border-left:4px solid var(--acento);border-radius:8px;
  background:var(--surface-2);font-size:14px;line-height:1.5;color:var(--texto)}
-.co2-vazio{padding:22px;border:1px dashed var(--borda-forte);border-radius:12px;color:var(--texto-suave)}
+.co2-vazio{margin:0 0 26px;padding:22px;border:1px dashed var(--borda-forte);border-radius:12px;color:var(--texto-suave)}
 
 /* cartões de recomendação */
-.co2-recs{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin:6px 0 18px}
-.co2-rec{padding:14px 16px;border:1px solid var(--borda);border-left:5px solid var(--borda-forte);
+.co2-recs{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin:6px 0 26px}
+.co2-rec{color:var(--texto);padding:14px 16px;border:1px solid var(--borda);border-left:5px solid var(--borda-forte);
  border-radius:12px;background:var(--surface);font-size:14px;line-height:1.5}
 .co2-rec-titulo{margin-bottom:6px;font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
 .co2-rec--alerta{border-left-color:var(--alerta)}.co2-rec--alerta .co2-rec-titulo{color:var(--alerta)}
@@ -140,7 +152,8 @@ CSS_REGRAS = """
  background-color:var(--surface-2);background-position:right 14px center!important;color:var(--texto);
  padding:0 38px 0 16px;font-size:14px;transition:all .18s ease}
 .co2-app select:focus,.co2-app button:focus-visible{outline:2px solid var(--acento);outline-offset:2px}
-.co2-app option:checked{background:var(--acento) linear-gradient(0deg,var(--acento),var(--acento));color:var(--bg);font-weight:700}
+.co2-app option{background:var(--surface-2);color:var(--texto)}
+.co2-app option:checked{background:var(--acento-forte) linear-gradient(0deg,var(--acento-forte),var(--acento-forte));color:var(--texto);font-weight:700}
 /* slider: ipywidgets 8 usa noUiSlider; Colab/ipywidgets 7 usa jQuery UI */
 .co2-app .noUi-connect,.co2-app .ui-slider-range{background:var(--acento)!important}
 
@@ -149,8 +162,8 @@ CSS_REGRAS = """
  color:var(--texto-suave)!important;border:1px solid var(--borda-forte)!important;border-radius:999px!important;
  box-shadow:none!important;font-weight:600;font-size:13px}
 .co2-app .widget-toggle-buttons .jupyter-button:hover{background:var(--borda)!important;color:var(--texto)!important}
-.co2-app .widget-toggle-buttons .jupyter-button.mod-active{background:var(--acento)!important;
- color:var(--bg)!important;border-color:var(--acento)!important}
+.co2-app .widget-toggle-buttons .jupyter-button.mod-active{background:var(--acento-forte)!important;
+ color:var(--texto)!important;border-color:var(--acento)!important}
 
 /* abas (as classes mudam entre ipywidgets 7 e 8, por isso [class*=...]) */
 .co2-abas>div:first-child{background:transparent!important;border:0!important;margin-bottom:12px}
@@ -161,20 +174,20 @@ CSS_REGRAS = """
  border-radius:999px!important;font-weight:600;font-size:14px}
 .co2-abas li[class*="TabBar-tab"]:before,.co2-abas li[class*="TabBar-tab"]:after{display:none!important}
 .co2-abas li[class*="TabBar-tab"]:hover{background:var(--borda)!important;color:var(--texto)!important}
-.co2-abas li[class*="TabBar-tab"][class*="mod-current"]{background:var(--acento)!important;color:var(--bg)!important;
+.co2-abas li[class*="TabBar-tab"][class*="mod-current"]{background:var(--acento-forte)!important;color:var(--texto)!important;
  border-color:var(--acento)!important}
-.co2-abas .widget-tab-contents{background:transparent!important;border:0!important;padding:4px 0 0!important}
+.co2-abas .widget-tab-contents{background:transparent!important;border:0!important;padding:4px 0 0!important;overflow:visible!important}
 
 /* painel de controles à esquerda de cada aba */
 .co2-controles{background:var(--surface);border:1px solid var(--borda);border-radius:14px;padding:16px!important;
- align-self:start}
+ align-self:start;margin-bottom:18px!important}
 .co2-controles .widget-readout{color:var(--texto)!important}
 
 /* gráficos e tabelas */
 .co2-app :has(>:is(.js-plotly-plot,.plotly-graph-div)){background:linear-gradient(145deg,var(--surface),var(--surface-2));
- border:1px solid var(--borda);border-radius:16px;padding:12px 16px 6px;margin:0 0 18px;box-sizing:border-box;
+ border:1px solid var(--borda);border-radius:16px;padding:12px 16px 6px;margin:0 0 26px;box-sizing:border-box;
  box-shadow:0 12px 30px rgba(0,10,28,.22)}
-.co2-app table.dataframe{width:100%;margin:0 0 18px;border:1px solid var(--borda)!important;
+.co2-app table.dataframe{width:100%;margin:0 0 26px;border:1px solid var(--borda)!important;
  border-collapse:separate!important;border-spacing:0;border-radius:14px;background:var(--surface);
  font-size:13px;font-variant-numeric:tabular-nums}
 .co2-app table.dataframe thead th{background:var(--bg)!important;color:var(--texto)!important;font-weight:700;
